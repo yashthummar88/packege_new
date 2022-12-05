@@ -138,7 +138,8 @@ class BookingModel {
     data['appointment_length'] = appointmentLength;
     data['location'] = location != null ? location!.toJson() : null;
     data['service'] = service != null ? service!.toJson() : null;
-    data['health_package'] = healthPackage != null ? healthPackage!.toJson() : null;
+    data['health_package'] =
+        healthPackage != null ? healthPackage!.toJson() : null;
     return data;
   }
 
@@ -180,6 +181,21 @@ class BookingModel {
       DateTime date, String uid) {
     final startDate = DateTime(date.year, date.month, date.day);
     final endDate = startDate.add(const Duration(days: 1));
+    final q = FirebaseFirestore.instance
+        .collection('bookings')
+        .where('doctor_id', isEqualTo: uid)
+        .where('appointment_time', isLessThan: endDate)
+        .where('appointment_time', isGreaterThan: startDate)
+        .orderBy('appointment_time', descending: false)
+        .snapshots();
+    return q.map((event) =>
+        event.docs.map((e) => BookingModel.fromJson(e.data(), e.id)).toList());
+  }
+
+  static Stream<List<BookingModel>> getMyCalenderBookings(
+      DateTime startDate, DateTime endDate, String uid) {
+    // final startDate = DateTime(date.year, date.month, date.day);
+    // final endDate = startDate.add(const Duration(days: 1));
     final q = FirebaseFirestore.instance
         .collection('bookings')
         .where('doctor_id', isEqualTo: uid)
@@ -281,7 +297,8 @@ class BookingModel {
         error: '',
         status: paymentStatus,
       );
-      await GraphDataModel.addPaymentLog(payment.doctorUid, payment.id, payment.createdOn.toDate(), int.parse(payment.actualAmountRecived));
+      await GraphDataModel.addPaymentLog(payment.doctorUid, payment.id,
+          payment.createdOn.toDate(), int.parse(payment.actualAmountRecived));
       await FirebaseFirestore.instance
           .collection('payments')
           .doc(payment.id)
@@ -290,7 +307,8 @@ class BookingModel {
         List<BookingModel> doOrDie = [];
         final linkID = paymentId;
         final bSlots = bookingSlots.map((e) {
-          final uid = "${Timestamp.now().microsecondsSinceEpoch}#${e.slotId.replaceAll(":", "")}";
+          final uid =
+              "${Timestamp.now().microsecondsSinceEpoch}#${e.slotId.replaceAll(":", "")}";
           final verificationCode = math.Random(1000).nextInt(9999);
           return e.copyWith(
             uid: uid,
@@ -320,21 +338,23 @@ class BookingModel {
               .then((value) async {
             final slotfee = int.parse(element.fees) / bookingSlots.length;
             final nSlot = Slot(id: element.slotId, fees: "$slotfee");
-            final appoint = AppointmentModel.fromJson(value.docs.first.data(), value.docs.first.id);
+            final appoint = AppointmentModel.fromJson(
+                value.docs.first.data(), value.docs.first.id);
             if (appoint.bookedSlots.where((bs) => bs.id == nSlot.id).isEmpty) {
               element.copyWith(statusCode: StatusCode.failed.toString());
             }
-              final bookedSlots = appoint.bookedSlots + [nSlot];
-              final app = appoint.copyWith(bookedSlots: bookedSlots);
-              await FirebaseFirestore.instance
-                  .collection('appointments')
-                  .doc(app.id)
-                  .set(app.toJson());
-              await FirebaseFirestore.instance
-                  .collection('bookings')
-                  .doc(element.uid)
-                  .set(element.toJson());
-              await GraphDataModel.addBookingLog(element.doctorId, element.userId, nSlot.id, element.appointmentTime.toDate());
+            final bookedSlots = appoint.bookedSlots + [nSlot];
+            final app = appoint.copyWith(bookedSlots: bookedSlots);
+            await FirebaseFirestore.instance
+                .collection('appointments')
+                .doc(app.id)
+                .set(app.toJson());
+            await FirebaseFirestore.instance
+                .collection('bookings')
+                .doc(element.uid)
+                .set(element.toJson());
+            await GraphDataModel.addBookingLog(element.doctorId, element.userId,
+                nSlot.id, element.appointmentTime.toDate());
           });
         });
         await Future.delayed(const Duration(milliseconds: 500));
@@ -396,7 +416,8 @@ class BookingModel {
             .collection('appointments')
             .doc(appointment.id)
             .set(app.toJson());
-        await GraphDataModel.addBookingLog(book.doctorId, book.userId, book.slotId, book.appointmentTime.toDate());
+        await GraphDataModel.addBookingLog(book.doctorId, book.userId,
+            book.slotId, book.appointmentTime.toDate());
         return DoOrDie(
           status: "Booked",
           message: "Successfully Booked !",
